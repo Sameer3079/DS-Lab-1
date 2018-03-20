@@ -6,12 +6,11 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 
 /**
- * A multithreaded chat room server.  When a client connects the
+ * A multi threaded chat room server.  When a client connects the
  * server requests a screen name by sending the client the
  * text "SUBMITNAME", and keeps requesting a name until
  * a unique one is received.  After a client submits a unique
@@ -36,17 +35,8 @@ public class ChatServer {
      */
     private static final int PORT = 9001;
 
-    /**
-     * The set of all names of clients in the chat room.  Maintained
-     * so that we can check that new clients are not registering name
-     * already in use.
-     */
-
-    /**
-     * The set of all the print writers for all the clients.  This
-     * set is kept so we can easily broadcast messages.
-     */
-
+    // A hash map to replace both hash sets
+    // reason: To find the writer for each client separately
     private static HashMap<String, PrintWriter> hashmap = new HashMap<String, PrintWriter>();
     /**
      * The application main method, which just listens on a port and
@@ -64,12 +54,14 @@ public class ChatServer {
         }
     }
     
-    private static void sendUserList() {
+    
+    // 
+    private static void sendUserList() { // Sends the list of connected clients to all clients
     	ArrayList<String> userList = new ArrayList<>(hashmap.keySet());
-        String userListStr = String.join(":", userList);
+        String userListStr = String.join(":", userList); // Joining the array to create a string
         
         for(String name : hashmap.keySet()) {
-        	hashmap.get(name).println("USERLIST" + userListStr);
+        	hashmap.get(name).println("USERLIST" + userListStr); // sending the string to all the clients
         }
     }
 
@@ -84,7 +76,6 @@ public class ChatServer {
         private BufferedReader in;
         private PrintWriter out;
         private String messageType = "";
-        private String selectedUsers;
 
         /**
          * Constructs a handler thread, squirreling away the socket.
@@ -131,7 +122,7 @@ public class ChatServer {
                 // Now that a successful name has been chosen, add the
                 // socket's print writer to the set of all writers so
                 // this client can receive broadcast messages.
-                hashmap.put(name, out);
+                hashmap.put(name, out); // adding the Name(key) and the PrintWriter(value) to the Hash Map
                 out.println("NAMEACCEPTED");
                 
                 sendUserList();
@@ -143,41 +134,36 @@ public class ChatServer {
                     if (input == null) {
                         return;
                     }
-                    
-                    if (input.substring(0,10).contains("BROADCAST"))
+                    // Identifying messageType
+                    String message[] = input.split(">>");
+                    String receipients[] = message[0].split(",");
+                    if(input.contains(">>")) {
+                    	if(receipients.length>1)
+                    		messageType = "MULTICAST";
+                    	else
+                    		messageType = "UNICAST";
+                    }
+                    else
                     	messageType = "BROADCAST";
-                    else if (input.substring(0,10).contains("MULTICAST")) {
-                    	messageType = "MULTICAST";
-                    }
-                    else if (input.substring(0,10).contains("UNICAST")) {
-                    	messageType = "UNICAST";
-                    }
-                    
-                    if (!input.contains(">>") && (messageType == "BROADCAST")) {
-                    	System.out.println("Message Type : BROADCAST");
-                    	System.out.println("socket: " + socket);
+                    // Sending the data according to the messageType
+                    if (messageType == "BROADCAST") {
                     	for (PrintWriter writer : hashmap.values()) {
                             writer.println("MESSAGE " + name + ": " + input);
                         }
                     }
                     else if(messageType == "UNICAST"){
-                    	String receipientName = input.substring(0, input.indexOf(">>"));
-                        if(hashmap.containsKey(receipientName)) {
-                			PrintWriter PW = hashmap.get(receipientName);
-                			input = input.substring(receipientName.length()+2);
-                			PW.println("MESSAGE " + name + " >> " + receipientName + "(UNICAST): " + input);
-                			out.println(name + ">> " + receipientName + "(UNICAST): " + input);
-                        }
-                        else{
-                            // The receiver does not exist
+                    	String receipientName = input.substring(0, input.indexOf(">>")); // Getting the name of the recipient
+                        if(hashmap.containsKey(receipientName)) { // Checks to see if the recipient exists in the Hash Map
+                			PrintWriter PW = hashmap.get(receipientName); // Getting the PrintWriter for the recipient
+                			input = input.substring(receipientName.length()+2); // Getting the message excluding the >> characters
+                			PW.println("MESSAGE " + name + " >> " + receipientName + "(UNICAST): " + input); // Sending the message to the client (recipient)
+                			out.println(name + ">> " + receipientName + "(UNICAST): " + input); // Sending the message to the client (sender)
                         }
                     }
-                    else { // MULTICAST
-                    	String[] selectedUsersArray = input.substring(input.indexOf("!@#$%^&*()_"+10)).split("!@#");
-                    	for (String selectedUser : selectedUsersArray) {
-                    		if(hashmap.containsKey(selectedUser)) {
-                    			PrintWriter writer = hashmap.get(selectedUser);
-                    			writer.println("MESSAGE " + name + " >> (MULTICAST): " + input);
+                    else if(messageType == "MULTICAST") {
+                    	for (int x=0; x<receipients.length; x++) { // Iterating through the selected clients
+                    		if(hashmap.containsKey(receipients[x])) { // Send the message if the recipient name is valid
+                    			hashmap.get(receipients[x]).println("MESSAGE " + name + ": " + message[1]);
                     		}
                     	}
                     }
@@ -188,8 +174,8 @@ public class ChatServer {
                 // This client is going down!  Remove its name and its print
                 // writer from the sets, and close its socket.
                 if (name != null && out != null) {
-                    hashmap.remove(name,out);
-                    sendUserList();
+                    hashmap.remove(name,out); // Remove the user and the print writer from the hash map
+                    sendUserList(); // Send the updated hash map details to the clients
                 }
                 try {
                     socket.close();

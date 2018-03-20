@@ -18,7 +18,6 @@ import javax.swing.JOptionPane;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
-import javax.swing.ListSelectionModel;
 
 /**
  * A simple Swing-based client for the chat server.  Graphically
@@ -37,7 +36,7 @@ import javax.swing.ListSelectionModel;
  * this string should be displayed in its message area.
  */
 public class ChatClient {
-//qwe
+
     BufferedReader in;
     PrintWriter out;
     JFrame frame = new JFrame("Chatter");
@@ -47,8 +46,9 @@ public class ChatClient {
     DefaultListModel<String> model = new DefaultListModel<>();
     JTextArea messageArea = new JTextArea(8, 40);
     HashSet<String> selectedUsers = new HashSet<String>();
-    String[] selectedUsersArray;
+    String selectedUsersString = "";
     String messageType = "";
+    String name = "";
     
     /**
      * Constructs the client by laying out the GUI and registering a
@@ -65,11 +65,9 @@ public class ChatClient {
         messageArea.setEditable(false);
         listBox.setVisible(true);
         listBox.setSize(500, 100);
-        listBox.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        listBox = new JList<String>(model);
         frame.getContentPane().add(textField, "North");
         frame.getContentPane().add(new JScrollPane(messageArea), "Center");
-        frame.getContentPane().add(listBox, "West");
+        frame.getContentPane().add(listBox, "West"); // Setting the listBox on the left side of the application
         frame.pack();
         
         
@@ -82,30 +80,31 @@ public class ChatClient {
              * the text area in preparation for the next message.
              */
             public void actionPerformed(ActionEvent e) {
-            	if(selectedUsers.size() == 1 || textField.getText().contains(">>")) {
-            		out.println("UNICAST" + textField.getText());
-            	}
-            	else if(selectedUsers.size() == listBox.getModel().getSize()) {
-            		out.println("BROADCAST" + textField.getText());
-            	}
-            	else {
-            		out.println("MULTICAST" + textField.getText() + "!@#$%^&*()_" + String.join("!@#", selectedUsers));
-            	}
-            	
-                //out.println(messageType + textField.getText());
-                //out.println(selectedUsersArray);
+            	out.println(textField.getText());
                 textField.setText("");
-                selectedUsers.clear();
+                selectedUsers.clear(); // Empty the hash set
+                selectedUsersString = ""; // Clearing the selected users after the message has been sent
             }
         });
         
-        listBox.addMouseListener(new MouseListener(){
+        listBox.addMouseListener(new MouseListener() {
 
 			@Override
 			public void mouseClicked(MouseEvent arg0) {
 				// TODO Auto-generated method stub
-				if((!selectedUsers.contains(listBox.getSelectedValue().toString()))) {
+				// Checking to see whether the newly selected name has already been selected and whether the selected name is the name of the sending client
+				if(!(selectedUsers.contains(listBox.getSelectedValue().toString()) & (name.equals(listBox.getSelectedValue().toString())))){
+					System.out.println("User Selected : " + listBox.getSelectedValue().toString() + " " + selectedUsers.contains(listBox.getSelectedValue().toString()));
 					selectedUsers.add(listBox.getSelectedValue().toString());
+					selectedUsersString += listBox.getSelectedValue().toString();
+					
+					// Resetting the text field so that the string can be placed in it
+					if(textField.getText() != ""){
+						textField.setText("");
+					}
+					
+					textField.setText(selectedUsersString + ">>");
+					selectedUsersString += ",";
 				}
 			}
 
@@ -190,7 +189,7 @@ public class ChatClient {
             	for (String user : userArray) {
 					model.addElement(user);
 				}
-            	listBox = new JList<String>(model);
+            	listBox.setModel(model);
             }
             else {
             	messageArea.append(line + "\n");
