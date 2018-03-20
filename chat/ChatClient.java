@@ -37,7 +37,7 @@ import javax.swing.ListSelectionModel;
  * this string should be displayed in its message area.
  */
 public class ChatClient {
-	
+//qwe
     BufferedReader in;
     PrintWriter out;
     JFrame frame = new JFrame("Chatter");
