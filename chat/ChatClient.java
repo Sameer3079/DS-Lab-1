@@ -2,11 +2,14 @@ package chat;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.HashSet;
 
 import javax.swing.DefaultListModel;
 import javax.swing.JFrame;
@@ -43,6 +46,9 @@ public class ChatClient {
     JList<String> listBox = new JList<String>();
     DefaultListModel<String> model = new DefaultListModel<>();
     JTextArea messageArea = new JTextArea(8, 40);
+    HashSet<String> selectedUsers = new HashSet<String>();
+    String[] selectedUsersArray;
+    String messageType = "";
     
     /**
      * Constructs the client by laying out the GUI and registering a
@@ -65,6 +71,8 @@ public class ChatClient {
         frame.getContentPane().add(new JScrollPane(messageArea), "Center");
         frame.getContentPane().add(listBox, "West");
         frame.pack();
+        
+        
 
         // Add Listeners
         textField.addActionListener(new ActionListener() {
@@ -74,9 +82,57 @@ public class ChatClient {
              * the text area in preparation for the next message.
              */
             public void actionPerformed(ActionEvent e) {
-                out.println(textField.getText());
+            	if(selectedUsers.size() == 1 || textField.getText().contains(">>")) {
+            		out.println("UNICAST" + textField.getText());
+            	}
+            	else if(selectedUsers.size() == listBox.getModel().getSize()) {
+            		out.println("BROADCAST" + textField.getText());
+            	}
+            	else {
+            		out.println("MULTICAST" + textField.getText() + "!@#$%^&*()_" + String.join("!@#", selectedUsers));
+            	}
+            	
+                //out.println(messageType + textField.getText());
+                //out.println(selectedUsersArray);
                 textField.setText("");
+                selectedUsers.clear();
             }
+        });
+        
+        listBox.addMouseListener(new MouseListener(){
+
+			@Override
+			public void mouseClicked(MouseEvent arg0) {
+				// TODO Auto-generated method stub
+				if((!selectedUsers.contains(listBox.getSelectedValue().toString()))) {
+					selectedUsers.add(listBox.getSelectedValue().toString());
+				}
+			}
+
+			@Override
+			public void mouseEntered(MouseEvent arg0) {
+				// TODO Auto-generated method stub
+				
+			}
+
+			@Override
+			public void mouseExited(MouseEvent arg0) {
+				// TODO Auto-generated method stub
+				
+			}
+
+			@Override
+			public void mousePressed(MouseEvent arg0) {
+				// TODO Auto-generated method stub
+				
+			}
+
+			@Override
+			public void mouseReleased(MouseEvent arg0) {
+				// TODO Auto-generated method stub
+				
+			}
+        	
         });
     }
 
@@ -130,10 +186,9 @@ public class ChatClient {
             else if (line.startsWith("USERLIST")) {
             	line = line.substring(8);
             	String[] userArray = line.split(":");
+            	model.clear();
             	for (String user : userArray) {
-					if(!model.contains(user)) {
-						model.addElement(user);
-					}
+					model.addElement(user);
 				}
             	listBox = new JList<String>(model);
             }

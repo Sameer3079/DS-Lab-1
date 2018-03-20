@@ -41,13 +41,11 @@ public class ChatServer {
      * so that we can check that new clients are not registering name
      * already in use.
      */
-    //private static HashSet<String> names = new HashSet<String>();
 
     /**
      * The set of all the print writers for all the clients.  This
      * set is kept so we can easily broadcast messages.
      */
-    //private static HashSet<PrintWriter> writers = new HashSet<PrintWriter>();
 
     private static HashMap<String, PrintWriter> hashmap = new HashMap<String, PrintWriter>();
     /**
@@ -65,6 +63,15 @@ public class ChatServer {
             listener.close();
         }
     }
+    
+    private static void sendUserList() {
+    	ArrayList<String> userList = new ArrayList<>(hashmap.keySet());
+        String userListStr = String.join(":", userList);
+        
+        for(String name : hashmap.keySet()) {
+        	hashmap.get(name).println("USERLIST" + userListStr);
+        }
+    }
 
     /**
      * A handler thread class.  Handlers are spawned from the listening
@@ -76,7 +83,8 @@ public class ChatServer {
         private Socket socket;
         private BufferedReader in;
         private PrintWriter out;
-        private String nameList = "";
+        private String messageType = "";
+        private String selectedUsers;
 
         /**
          * Constructs a handler thread, squirreling away the socket.
@@ -115,9 +123,6 @@ public class ChatServer {
                     }
                     synchronized (hashmap.keySet()) {
                         if (!hashmap.keySet().contains(name)) {
-                        	hashmap.keySet().add(name);
-                            //namesList.add(name);
-                            //System.out.println("Names socket: " + name + "-------" + socket.getPort());
                             break;
                         }
                     }
@@ -128,15 +133,8 @@ public class ChatServer {
                 // this client can receive broadcast messages.
                 hashmap.put(name, out);
                 out.println("NAMEACCEPTED");
-                ArrayList<String> userList = new ArrayList<>(hashmap.keySet());
-                String userListStr = String.join(":", userList);
                 
-                for(String name : hashmap.keySet()) {
-                	hashmap.get(name).println("USERLIST" + userListStr);
-                }
-                
-                
-                
+                sendUserList();
 
                 // Accept messages from this client and broadcast them.
                 // Ignore other clients that cannot be broadcasted to.
@@ -146,24 +144,42 @@ public class ChatServer {
                         return;
                     }
                     
-                    if (!input.contains(">>")) {
+                    if (input.substring(0,10).contains("BROADCAST"))
+                    	messageType = "BROADCAST";
+                    else if (input.substring(0,10).contains("MULTICAST")) {
+                    	messageType = "MULTICAST";
+                    }
+                    else if (input.substring(0,10).contains("UNICAST")) {
+                    	messageType = "UNICAST";
+                    }
+                    
+                    if (!input.contains(">>") && (messageType == "BROADCAST")) {
                     	System.out.println("Message Type : BROADCAST");
                     	System.out.println("socket: " + socket);
                     	for (PrintWriter writer : hashmap.values()) {
                             writer.println("MESSAGE " + name + ": " + input);
                         }
                     }
-                    else {
+                    else if(messageType == "UNICAST"){
                     	String receipientName = input.substring(0, input.indexOf(">>"));
                         if(hashmap.containsKey(receipientName)) {
                 			PrintWriter PW = hashmap.get(receipientName);
                 			input = input.substring(receipientName.length()+2);
-                			PW.println("MESSAGE " + name + " >> " + receipientName + "(PM): " + input);
-                			out.println(name + ">> " + receipientName + "(PM): " + input);
+                			PW.println("MESSAGE " + name + " >> " + receipientName + "(UNICAST): " + input);
+                			out.println(name + ">> " + receipientName + "(UNICAST): " + input);
                         }
                         else{
                             // The receiver does not exist
                         }
+                    }
+                    else { // MULTICAST
+                    	String[] selectedUsersArray = input.substring(input.indexOf("!@#$%^&*()_"+10)).split("!@#");
+                    	for (String selectedUser : selectedUsersArray) {
+                    		if(hashmap.containsKey(selectedUser)) {
+                    			PrintWriter writer = hashmap.get(selectedUser);
+                    			writer.println("MESSAGE " + name + " >> (MULTICAST): " + input);
+                    		}
+                    	}
                     }
                 }
             } catch (IOException e) {
@@ -173,12 +189,7 @@ public class ChatServer {
                 // writer from the sets, and close its socket.
                 if (name != null && out != null) {
                     hashmap.remove(name,out);
-                    ArrayList<String> userList = new ArrayList<>(hashmap.keySet());
-                    String userListStr = String.join(":", userList);
-                    
-                    for(String name : hashmap.keySet()) {
-                    	hashmap.get(name).println("USERLIST" + userListStr);
-                    }
+                    sendUserList();
                 }
                 try {
                     socket.close();
